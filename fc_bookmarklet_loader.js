@@ -3,7 +3,7 @@ javascript:(
     var js = document.createElement('script');
     js.setAttribute('type', 'text/javascript');
     js.setAttribute('id', 'frozenCookieScript');
-    js.setAttribute('src', 'https://raw.githubusercontent.com/fooshftw/FrozenCookies/master/frozen_cookies.js');
+    js.setAttribute('src', 'https://rawgit.com/fooshftw/FrozenCookies/master/frozen_cookies.js');
     document.head.appendChild(js);
  }()
 );
