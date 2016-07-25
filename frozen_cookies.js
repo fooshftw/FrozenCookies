@@ -2,7 +2,7 @@
 var scriptElement = document.getElementById( 'frozenCookieScript' ),
 	baseUrl = scriptElement !== null ?
 		scriptElement.getAttribute('src').replace(/\/frozen_cookies\.js$/, '') :
-		'https://cdn.rawgit.com/Icehawk78/FrozenCookies/master',
+		'https://raw.githubusercontent.com/fooshftw/FrozenCookies/master',
 	FrozenCookies = {
 		'baseUrl': baseUrl,
 		'branch' : 'Beta-',
