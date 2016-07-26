@@ -46,7 +46,7 @@ function setOverrides() {
   // Set default values for calculations
   FrozenCookies.hc_gain = 0;
   FrozenCookies.hc_gain_time = Date.now();
-  FrozenCookies.last_gc_state = (Game.hasBuff('Frenzy') ? Game.buffs['Frenzy'].multCpS : 1) * (Game.hasBuff('Click frenzy') ? Game.buffs['Click frenzy'].multCpS : 1);
+  FrozenCookies.last_gc_state = (Game.hasBuff('Frenzy') ? Game.buffs['Frenzy'].multCpS : 1) * (Game.hasBuff('Click frenzy') ? Game.buffs['Click frenzy'].multClick : 1);
   FrozenCookies.last_gc_time = Date.now();
   FrozenCookies.lastCPS = Game.cookiesPs;
   FrozenCookies.lastCookieCPS = 0;
@@ -56,7 +56,8 @@ function setOverrides() {
   FrozenCookies.disabledPopups = true;
   FrozenCookies.trackedStats = [];
   FrozenCookies.lastGraphDraw = 0;
-  
+  FrozenCookies.calculatedCpsByType = {};
+
   // Allow autoCookie to run
   FrozenCookies.processing = false;
   FrozenCookies.priceReductionTest = false;
@@ -103,7 +104,7 @@ function setOverrides() {
   // Replace Game.Popup references with event logging
   eval('Game.shimmerTypes.golden.popFunc = ' + Game.shimmerTypes.golden.popFunc.toString().replace(/Game\.Popup\((.+)\)\;/g, 'logEvent("GC", $1, true);'));
   eval('Game.UpdateWrinklers = ' + Game.UpdateWrinklers.toString().replace(/Game\.Popup\((.+)\)\;/g, 'logEvent("Wrinkler", $1, true);'));
-  eval('FrozenCookies.safeGainsCalc = ' + Game.CalculateGains.toString().replace(/Game\.cookiesPsByType/, '// Game.cookiesPsByType').replace(/eggMult\+=\(1.+/, 'eggMult++; // CENTURY EGGS SUCK').replace(/Game\.cookiesPs/g, 'FrozenCookies.calculatedCps').replace(/Game\.globalCpsMult/g, 'mult'));
+  eval('FrozenCookies.safeGainsCalc = ' + Game.CalculateGains.toString().replace(/eggMult\+=\(1.+/, 'eggMult++; // CENTURY EGGS SUCK').replace(/Game\.cookiesPs/g, 'FrozenCookies.calculatedCps').replace(/Game\.globalCpsMult/g, 'mult'));
 
   // Give free achievements!
   if(!Game.HasAchiev('Third-party')) {
@@ -260,7 +261,7 @@ function fcReset() {
   }
   Game.oldReset();
   FrozenCookies.frenzyTimes = {};
-  FrozenCookies.last_gc_state = (Game.hasBuff('Frenzy') ? Game.buffs['Frenzy'].multCpS : 1) * (Game.hasBuff('Click frenzy') ? Game.buffs['Click frenzy'].multCpS : 1);
+  FrozenCookies.last_gc_state = (Game.hasBuff('Frenzy') ? Game.buffs['Frenzy'].multCpS : 1) * (Game.hasBuff('Click frenzy') ? Game.buffs['Click frenzy'].multClick : 1);
   FrozenCookies.last_gc_time = Date.now();
   FrozenCookies.lastHCAmount = Game.HowMuchPrestige(Game.cookiesEarned + Game.cookiesReset + Game.wrinklers.reduce(function(s,w){return s + popValue(w.sucked);}, 0));
   FrozenCookies.lastHCTime = Date.now();
@@ -464,7 +465,7 @@ function baseCps() {
 }
 
 function baseClickingCps(clickSpeed) {
-  var clickFrenzyMod = (Game.hasBuff('Click frenzy') > 0) ? Game.buffs['Click frenzy'].multCpS : 1;
+  var clickFrenzyMod = (Game.hasBuff('Click frenzy') > 0) ? Game.buffs['Click frenzy'].multClick : 1;
   var frenzyMod = (Game.hasBuff('Frenzy') > 0) ? Game.buffs['Frenzy'].multCpS : 1;
   var cpc = Game.mouseCps() / (clickFrenzyMod * frenzyMod);
   return clickSpeed * cpc;
@@ -541,7 +542,7 @@ function cookieStats(bankAmount, wrathValue, wrinklerCount) {
   var clickCps = baseClickingCps(FrozenCookies.autoClick * FrozenCookies.cookieClickSpeed);
   var frenzyCps = FrozenCookies.autoFrenzy ? baseClickingCps(FrozenCookies.autoFrenzy * FrozenCookies.frenzyClickSpeed) : clickCps;
   var luckyMod = Game.Has('Get lucky') ? 2 : 1;
-  var clickFrenzyMod = (Game.hasBuff('Click frenzy') > 0) ? Game.buffs['Click frenzy'].multCpS : 1
+  var clickFrenzyMod = (Game.hasBuff('Click frenzy') > 0) ? Game.buffs['Click frenzy'].multClick : 1
   wrathValue = wrathValue != null ? wrathValue : Game.elderWrath;
   wrinklerCount = wrinklerCount != null ? wrinklerCount : (wrathValue ? 10 : 0);
   var wrinkler = wrinklerMod(wrinklerCount);
@@ -1108,7 +1109,7 @@ function upgradeToggle(upgrade, achievements, reverseFunctions) {
     achievements.forEach(function(won, index){
       var achievement = Game.AchievementsById[index];
       achievement.won = won;
-      if (won && achievement.hide < 3) {
+      if (won && achievement.pool != 'shadow') {
         Game.AchievementsOwned += 1;
       }
     });
@@ -1131,7 +1132,7 @@ function buildingToggle(building, achievements) {
     achievements.forEach(function(won, index){
       var achievement = Game.AchievementsById[index];
       achievement.won = won;
-      if (won && achievement.hide < 3) {
+      if (won && achievement.pool != 'shadow') {
         Game.AchievementsOwned += 1;
       }
     });
@@ -1393,7 +1394,7 @@ function fcWin(what) {
         if (!FrozenCookies.disabledPopups) {
           logEvent('Achievement', 'Achievement unlocked :<br>'+Game.Achievements[what].name+'<br> ', true);
         }
-        if (Game.Achievements[what].hide!=3) {
+        if (Game.Achievements[what].pool != 'shadow') {
           Game.AchievementsOwned++;
         }
         Game.recalculateGains=1;
@@ -1598,7 +1599,7 @@ function autoCookie() {
     if (FrozenCookies.autoBlacklistOff) {
       autoBlacklistOff();
     }
-    var currentFrenzy = (Game.hasBuff('Frenzy') ? Game.buffs['Frenzy'].multCpS : 1) * (Game.hasBuff('Click frenzy') ? Game.buffs['Click frenzy'].multCpS : 1);
+    var currentFrenzy = (Game.hasBuff('Frenzy') ? Game.buffs['Frenzy'].multCpS : 1) * (Game.hasBuff('Click frenzy') ? Game.buffs['Click frenzy'].multClick : 1);
     if (currentFrenzy != FrozenCookies.last_gc_state) {
       if (FrozenCookies.last_gc_state != 1 && currentFrenzy == 1) {
       	logEvent('GC', 'Frenzy ended, cookie production x1');
